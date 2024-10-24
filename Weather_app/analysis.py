@@ -1,28 +1,23 @@
-from models import db, WeatherData, WeatherStats
-from sqlalchemy import func
+from app import app, db  # Import your Flask app and SQLAlchemy instance
+from models import WeatherData  # Ensure your model is correctly imported
+from sqlalchemy import extract  # Import the 'extract' function to extract the year from the date
 
 def calculate_weather_stats():
-    results = db.session.query(
-        func.extract('year', WeatherData.date).label('year'),
-        WeatherData.station_id,
-        func.avg(WeatherData.max_temperature).label('avg_max_temp'),
-        func.avg(WeatherData.min_temperature).label('avg_min_temp'),
-        func.sum(WeatherData.precipitation).label('total_precipitation')
-    ).group_by('year', WeatherData.station_id).all()
+    with app.app_context():  # Use Flask app context
+        results = db.session.query(
+            extract('year', WeatherData.date).label('year'),  # Extract year from 'date'
+            WeatherData.station_id,
+            db.func.avg(WeatherData.max_temperature).label('avg_max_temp'),  # Calculate average max temperature
+            db.func.avg(WeatherData.min_temperature).label('avg_min_temp'),  # Calculate average min temperature
+            db.func.sum(WeatherData.precipitation).label('total_precipitation')  # Sum precipitation
+        ).group_by(extract('year', WeatherData.date), WeatherData.station_id).all()
 
-    for year, station_id, avg_max_temp, avg_min_temp, total_precipitation in results:
-        stat = WeatherStats(
-            year=int(year),
-            station_id=station_id,
-            avg_max_temp=avg_max_temp,
-            avg_min_temp=avg_min_temp,
-            total_precipitation=total_precipitation
-        )
-        db.session.add(stat)
-
-    db.session.commit()
+        # Process results as needed
+        for result in results:
+            print(f"Year: {result.year}, Station ID: {result.station_id}, "
+                  f"Avg Max Temp: {result.avg_max_temp}, "
+                  f"Avg Min Temp: {result.avg_min_temp}, "
+                  f"Total Precipitation: {result.total_precipitation}")
 
 if __name__ == "__main__":
-    from app import app
-    with app.app_context():
-        calculate_weather_stats()
+    calculate_weather_stats()  # Call the function to calculate weather stats
